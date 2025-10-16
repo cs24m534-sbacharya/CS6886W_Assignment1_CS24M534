@@ -1,3 +1,6 @@
+# CS688W-Systems for Deep Learning
+# Assignment -1 exploring VGG6 on CIFAR-10 with different configuration
+# cs24m534 Santi Bhusan Acharya 
 
 # VGG6 CIFAR-10 Deep Learning Project
 
