@@ -7,6 +7,14 @@
 import wandb
 wandb.login()
 
+import torch
+import torch.nn as nn
+import torch.optim as optim
+import torchvision
+import torchvision.transforms as transforms
+from torch.utils.data import DataLoader
+import wandb
+
 # Sweep Configuration
 sweep_config = {
     'method': 'random',
@@ -20,7 +28,6 @@ sweep_config = {
     }
 }
 
-#Training Function
 def train():
     import torch
     import torch.nn as nn
@@ -30,12 +37,10 @@ def train():
     from torch.utils.data import DataLoader
 
     # Initialize W&B with custom run name
-    
-    wandb.init(project="vgg6-sweep-sba8")
+    wandb.init(project="vgg6-sweep-sba10")
     wandb.run.name = f"act_{wandb.config.activation}_bs_{wandb.config.batch_size}_opt_{wandb.config.optimizer}_lr_{wandb.config.learning_rate}_ep_{wandb.config.epochs}"
     #wandb.run.save()
     config = wandb.config
-
 
     activation_map = {
         "ReLU": nn.ReLU,
@@ -77,7 +82,7 @@ def train():
 
         def forward(self, x):
             return self.classifier(self.features(x))
-
+    
     # Data transforms
     transform_train = transforms.Compose([
         transforms.RandomCrop(32, padding=4),
@@ -101,9 +106,10 @@ def train():
     # Setup model and optimizer
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = VGG6(activation_map[config.activation]).to(device)
-    #optimizer = optim.Adam(model.parameters(), lr=config.learning_rate)
     optimizer = optimizer_map[config.optimizer](model.parameters(), lr = config.learning_rate)
     criterion = nn.CrossEntropyLoss()
+
+    best_acc = 0.0
 
     # Training loop
     for epoch in range(config.epochs):
@@ -136,7 +142,7 @@ def train():
         val_acc = 100. * correct / total
         val_loss /= len(testloader)
 
-        # Log metrics
+         # Log metrics
         wandb.log({
             "Epoch": epoch + 1,
             "Train Accuracy": train_acc,
@@ -145,6 +151,15 @@ def train():
             "Validation Loss": val_loss
         })
 
+        if val_acc > best_acc:
+            best_acc = val_acc
+            torch.save(model.state_dict(), "best_model.pth")
+
+            # Upload to W&B
+            artifact = wandb.Artifact("best_model", type="model")
+            artifact.add_file("best_model.pth")
+            wandb.log_artifact(artifact)
+
 # Launch the sweep
-sweep_id = wandb.sweep(sweep_config, project="vgg6-sweep-sba8")
+sweep_id = wandb.sweep(sweep_config, project="vgg6-sweep-sba10")
 wandb.agent(sweep_id, function=train)
